@@ -85,6 +85,13 @@ async function run() {
       const result = await lessonCollection.insertOne(lesson);
       res.send(result);
     });
+    // GET Single Lesson by ID
+    app.get('/lessons/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await lessonCollection.findOne(query);
+      res.send(result);
+    });
      // DELETE Lesson
     app.delete('/lessons/:id', async (req, res) => {
         const id = req.params.id;
