@@ -62,12 +62,35 @@ async function run() {
         const result = await lessonCollection.find(query).toArray();
         res.send(result);
     });
+    // GET Lessons (Handles both "All Public" and "My Lessons by Email")
+    app.get('/lessons', async (req, res) => {
+        const email = req.query.email;
+        let query = {};
+        
+        if (email) {
+            // If email is provided, get lessons for that specific user (Dashboard)
+            query = { 'author.email': email };
+        } else {
+            // If no email, get only PUBLIC lessons (Home/Explore page)
+            query = { privacy: "Public" };
+        }
+        
+        const result = await lessonCollection.find(query).toArray();
+        res.send(result);
+    });
 // --- LESSONS API ---
     // 1. Post a new lesson
     app.post('/lessons', async (req, res) => {
       const lesson = req.body;
       const result = await lessonCollection.insertOne(lesson);
       res.send(result);
+    });
+     // DELETE Lesson
+    app.delete('/lessons/:id', async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await lessonCollection.deleteOne(query);
+        res.send(result);
     });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
