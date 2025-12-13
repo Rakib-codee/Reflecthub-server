@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jrfrvrx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -33,20 +33,28 @@ async function run() {
     const lessonCollection = db.collection("lessons");
     // const paymentCollection = db.collection("payments"); // We will use this later
 
-    // --- USERS API ---
-    // 1. Save or Update User (When they login/register)
+ // --- USERS API ---
     app.post('/users/:email', async (req, res) => {
       const email = req.params.email;
       const user = req.body;
+      
+      // LOG TO DEBUG
+      console.log("1. Hit /users endpoint for:", email);
+      console.log("2. Data received:", user);
+
       const query = { email: email };
-      const options = { upsert: true };
-      const updateDoc = {
-        $set: user,
-      };
-      const result = await userCollection.updateOne(query, updateDoc, options);
+      
+      // Check if user already exists
+      const existingUser = await userCollection.findOne(query);
+      if (existingUser) {
+        console.log("3. User already exists, checking if we need to update...");
+        return res.send({ message: 'User already exists', insertedId: null });
+      }
+
+      const result = await userCollection.insertOne(user);
+      console.log("4. User inserted successfully:", result);
       res.send(result);
     });
-
     // --- LESSONS API (Public) ---
     // Get all public lessons (with Search & Filter logic later)
     app.get('/lessons', async (req, res) => {
@@ -54,7 +62,13 @@ async function run() {
         const result = await lessonCollection.find(query).toArray();
         res.send(result);
     });
-
+// --- LESSONS API ---
+    // 1. Post a new lesson
+    app.post('/lessons', async (req, res) => {
+      const lesson = req.body;
+      const result = await lessonCollection.insertOne(lesson);
+      res.send(result);
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
