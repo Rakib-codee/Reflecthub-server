@@ -99,6 +99,13 @@ async function run() {
         const result = await lessonCollection.deleteOne(query);
         res.send(result);
     });
+    // GET Single User by Email (To check admin/premium status)
+    app.get('/users/:email', async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        res.send(user);
+    });
      // --- PAYMENT API ---
 
     // 1. Create Payment Intent
