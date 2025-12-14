@@ -99,6 +99,42 @@ async function run() {
         const result = await lessonCollection.deleteOne(query);
         res.send(result);
     });
+     // --- PAYMENT API ---
+
+    // 1. Create Payment Intent
+    app.post('/create-payment-intent', async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100); // Stripe calculates in cents/poisha
+      
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'bdt', // or 'usd'
+        payment_method_types: ['card']
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      });
+    });
+
+    // 2. Save Payment & Upgrade User
+    app.post('/payments', async (req, res) => {
+        const payment = req.body;
+        
+        // A. Save to payments collection
+        const paymentResult = await client.db("lifeLessonsDB").collection("payments").insertOne(payment);
+
+        // B. Update User Status to Premium
+        const query = { email: payment.email };
+        const updatedDoc = {
+            $set: {
+                isPremium: true
+            }
+        }
+        const userResult = await userCollection.updateOne(query, updatedDoc);
+
+        res.send({ paymentResult, userResult });
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
