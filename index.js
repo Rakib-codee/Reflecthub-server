@@ -62,6 +62,20 @@ async function run() {
         const result = await userCollection.deleteOne(query);
         res.send(result);
     });
+    // UPDATE USER PROFILE API (Name & Photo)
+    app.patch('/user-update/:email', async (req, res) => {
+        const email = req.params.email;
+        const filter = { email: email };
+        const updatedDoc = {
+            $set: {
+                name: req.body.name,
+                photoURL: req.body.photoURL
+            }
+        }
+        const result = await userCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+    });
+
     // CHECK ADMIN STATUS
     app.get('/users/admin/:email', async (req, res) => {
       const email = req.params.email;
