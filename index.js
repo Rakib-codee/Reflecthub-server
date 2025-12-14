@@ -8,8 +8,30 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(express.json());
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 
 // MongoDB Connection
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jrfrvrx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -126,11 +148,6 @@ async function run() {
     });
     // --- LESSONS API (Public) ---
     // Get all public lessons (with Search & Filter logic later)
-    app.get('/lessons', async (req, res) => {
-        const query = { privacy: "Public" }; // Only show public lessons
-        const result = await lessonCollection.find(query).toArray();
-        res.send(result);
-    });
     // GET Lessons (Handles both "All Public" and "My Lessons by Email")
     app.get('/lessons', async (req, res) => {
         const email = req.query.email;
@@ -241,9 +258,21 @@ async function run() {
 run().catch(console.dir);
 
 app.get('/', (req, res) => {
-  res.send('Digital Life Lessons Server is Running');
+    res.send('Digital Life Lessons Server is Running');
+});
+
+app.use((req, res) => {
+    res.status(404).json({ message: 'Not Found' });
+});
+
+app.use((err, req, res, next) => {
+    console.error(err);
+    if (err && err.message === 'Not allowed by CORS') {
+        return res.status(403).json({ message: 'CORS Forbidden' });
+    }
+    res.status(500).json({ message: 'Internal Server Error' });
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+    console.log(`Server is running on port ${port}`);
 });
