@@ -129,6 +129,25 @@ async function run() {
         const result = await lessonCollection.deleteOne(query);
         res.send(result);
     });
+     // UPDATE LESSON API
+    app.put('/lessons/:id', async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedLesson = req.body;
+        const lesson = {
+            $set: {
+                title: updatedLesson.title,
+                description: updatedLesson.description,
+                category: updatedLesson.category,
+                tone: updatedLesson.tone,
+                photoURL: updatedLesson.photoURL,
+                privacy: updatedLesson.privacy,
+                access: updatedLesson.access
+            }
+        }
+        const result = await lessonCollection.updateOne(filter, lesson);
+        res.send(result);
+    });
     // GET Single User by Email (To check admin/premium status)
     app.get('/users/:email', async (req, res) => {
         const email = req.params.email;
