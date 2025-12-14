@@ -55,6 +55,36 @@ async function run() {
       console.log("4. User inserted successfully:", result);
       res.send(result);
     });
+    // CHECK ADMIN STATUS
+    app.get('/users/admin/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user?.role === 'admin';
+      }
+      res.send({ admin });
+    });
+
+    // GET ALL USERS (For Admin Dashboard)
+    app.get('/users', async (req, res) => {
+        const result = await userCollection.find().toArray();
+        res.send(result);
+    });
+
+    // MAKE ADMIN API
+    app.patch('/users/admin/:id', async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+            $set: {
+                role: 'admin'
+            }
+        }
+        const result = await userCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+    });
     // --- LESSONS API (Public) ---
     // Get all public lessons (with Search & Filter logic later)
     app.get('/lessons', async (req, res) => {
