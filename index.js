@@ -72,6 +72,24 @@ async function run() {
         const result = await userCollection.find().toArray();
         res.send(result);
     });
+    // ADMIN STATS API
+    app.get('/admin-stats', async (req, res) => {
+        const users = await userCollection.estimatedDocumentCount();
+        const lessons = await lessonCollection.estimatedDocumentCount();
+        
+        // Count Premium Users
+        const premiumUsers = await userCollection.countDocuments({ isPremium: true });
+
+        // (Optional) Calculate Total Revenue (Premium Users * 1500)
+        const revenue = premiumUsers * 1500;
+
+        res.send({
+            users,
+            lessons,
+            premiumUsers,
+            revenue
+        });
+    });
 
     // MAKE ADMIN API
     app.patch('/users/admin/:id', async (req, res) => {
