@@ -48,23 +48,46 @@ app.get('/health', (req, res) => {
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jrfrvrx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
-});
+let _mongoClientPromise;
+function getMongoClientPromise() {
+  if (_mongoClientPromise) return _mongoClientPromise;
+
+  const client = new MongoClient(uri, {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    }
+  });
+
+  _mongoClientPromise = client.connect()
+    .then(() => client)
+    .catch((err) => {
+      _mongoClientPromise = undefined;
+      throw err;
+    });
+  return _mongoClientPromise;
+}
 
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
 
-    const db = client.db("lifeLessonsDB");
-    const userCollection = db.collection("users");
-    const lessonCollection = db.collection("lessons");
-    // const paymentCollection = db.collection("payments"); // We will use this later
+    const getDb = async () => {
+      const client = await getMongoClientPromise();
+      return client.db("lifeLessonsDB");
+    };
+
+    const getUserCollection = async () => {
+      const db = await getDb();
+      return db.collection("users");
+    };
+
+    const getLessonCollection = async () => {
+      const db = await getDb();
+      return db.collection("lessons");
+    };
 
  // --- USERS API ---
     app.post('/users/:email', async (req, res) => {
@@ -74,6 +97,8 @@ async function run() {
       // LOG TO DEBUG
       console.log("1. Hit /users endpoint for:", email);
       console.log("2. Data received:", user);
+
+      const userCollection = await getUserCollection();
 
       const query = { email: email };
       
@@ -92,6 +117,7 @@ async function run() {
     app.delete('/users/:id', async (req, res) => {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
+        const userCollection = await getUserCollection();
         const result = await userCollection.deleteOne(query);
         res.send(result);
     });
@@ -99,6 +125,7 @@ async function run() {
     app.patch('/user-update/:email', async (req, res) => {
         const email = req.params.email;
         const filter = { email: email };
+        const userCollection = await getUserCollection();
         const updatedDoc = {
             $set: {
                 name: req.body.name,
@@ -113,6 +140,7 @@ async function run() {
     app.get('/users/admin/:email', async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
+      const userCollection = await getUserCollection();
       const user = await userCollection.findOne(query);
       let admin = false;
       if (user) {
@@ -123,11 +151,14 @@ async function run() {
 
     // GET ALL USERS (For Admin Dashboard)
     app.get('/users', async (req, res) => {
+        const userCollection = await getUserCollection();
         const result = await userCollection.find().toArray();
         res.send(result);
     });
     // ADMIN STATS API
     app.get('/admin-stats', async (req, res) => {
+        const userCollection = await getUserCollection();
+        const lessonCollection = await getLessonCollection();
         const users = await userCollection.estimatedDocumentCount();
         const lessons = await lessonCollection.estimatedDocumentCount();
         
@@ -149,6 +180,7 @@ async function run() {
     app.patch('/users/admin/:id', async (req, res) => {
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
+        const userCollection = await getUserCollection();
         const updatedDoc = {
             $set: {
                 role: 'admin'
@@ -163,6 +195,8 @@ async function run() {
     app.get('/lessons', async (req, res) => {
         const email = req.query.email;
         let query = {};
+
+        const lessonCollection = await getLessonCollection();
         
         if (email) {
             // If email is provided, get lessons for that specific user (Dashboard)
@@ -179,6 +213,7 @@ async function run() {
     // 1. Post a new lesson
     app.post('/lessons', async (req, res) => {
       const lesson = req.body;
+      const lessonCollection = await getLessonCollection();
       const result = await lessonCollection.insertOne(lesson);
       res.send(result);
     });
@@ -186,6 +221,7 @@ async function run() {
     app.get('/lessons/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
+      const lessonCollection = await getLessonCollection();
       const result = await lessonCollection.findOne(query);
       res.send(result);
     });
@@ -193,6 +229,7 @@ async function run() {
     app.delete('/lessons/:id', async (req, res) => {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
+        const lessonCollection = await getLessonCollection();
         const result = await lessonCollection.deleteOne(query);
         res.send(result);
     });
@@ -201,6 +238,7 @@ async function run() {
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
         const updatedLesson = req.body;
+        const lessonCollection = await getLessonCollection();
         const lesson = {
             $set: {
                 title: updatedLesson.title,
@@ -219,6 +257,7 @@ async function run() {
     app.get('/users/:email', async (req, res) => {
         const email = req.params.email;
         const query = { email: email };
+        const userCollection = await getUserCollection();
         const user = await userCollection.findOne(query);
         res.send(user);
     });
@@ -243,9 +282,12 @@ async function run() {
     // 2. Save Payment & Upgrade User
     app.post('/payments', async (req, res) => {
         const payment = req.body;
+
+        const db = await getDb();
+        const userCollection = await getUserCollection();
         
         // A. Save to payments collection
-        const paymentResult = await client.db("lifeLessonsDB").collection("payments").insertOne(payment);
+        const paymentResult = await db.collection("payments").insertOne(payment);
 
         // B. Update User Status to Premium
         const query = { email: payment.email };
@@ -259,6 +301,7 @@ async function run() {
         res.send({ paymentResult, userResult });
     });
     // Send a ping to confirm a successful connection
+    const client = await getMongoClientPromise();
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
